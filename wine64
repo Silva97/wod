@@ -1,0 +1,36 @@
+#!/bin/bash
+
+set -euo pipefail
+
+IMAGE="wine64:latest"
+
+if [[ $# -lt 1 ]]; then
+  echo "Usage: $0 program.exe [args...]"
+  exit 1
+fi
+
+xhost +local:docker >/dev/null
+trap 'xhost -local:docker >/dev/null 2>&1 || true' EXIT
+
+docker run --rm -it \
+  --network none \
+  --gpus all \
+  --cap-drop=ALL \
+  --security-opt no-new-privileges \
+  -e NVIDIA_VISIBLE_DEVICES=all \
+  -e NVIDIA_DRIVER_CAPABILITIES=graphics,utility,display,video,compute \
+  -e __NV_PRIME_RENDER_OFFLOAD=1 \
+  -e __GLX_VENDOR_LIBRARY_NAME=nvidia \
+  -e __VK_LAYER_NV_optimus=NVIDIA_only \
+  -e PULSE_SERVER=unix:/tmp/pulse/native \
+  -e PULSE_COOKIE=/tmp/pulse/cookie \
+  -e DISPLAY="$DISPLAY" \
+  -e XDG_RUNTIME_DIR=/tmp/xdg-runtime \
+  -v "$XDG_RUNTIME_DIR/pulse/native:/tmp/pulse/native" \
+  -v "$HOME/.config/pulse/cookie:/tmp/pulse/cookie:ro" \
+  -v "$HOME/.wine:/tmp/.wine" \
+  -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+  -v "$PWD:/app" \
+  -w /app \
+  "$IMAGE" \
+  "$@"
